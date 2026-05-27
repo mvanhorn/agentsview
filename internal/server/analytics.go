@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -390,6 +391,11 @@ func (s *Server) handleAnalyticsSignalSessions(
 	)
 	if err != nil {
 		if handleContextError(w, err) {
+			return
+		}
+		if errors.Is(err, db.ErrUnsupportedAnalyticsSignal) {
+			writeError(w, http.StatusBadRequest,
+				"unsupported signal parameter")
 			return
 		}
 		log.Printf("analytics signal sessions error: %v", err)

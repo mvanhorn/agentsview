@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -15,6 +16,35 @@ import (
 // maxSQLVars is the maximum bind variables per IN clause to stay
 // within SQLite's default SQLITE_MAX_VARIABLE_NUMBER (999).
 const maxSQLVars = 500
+
+var ErrUnsupportedAnalyticsSignal = errors.New(
+	"unsupported analytics signal",
+)
+
+var supportedAnalyticsSignals = map[string]struct{}{
+	"outcome_errored":                {},
+	"outcome_abandoned":              {},
+	"outcome_completed":              {},
+	"tool_failure_signals":           {},
+	"tool_retries":                   {},
+	"edit_churn":                     {},
+	"sessions_with_compaction":       {},
+	"mid_task_compaction_count":      {},
+	"high_pressure_sessions":         {},
+	"short_prompt_count":             {},
+	"unstructured_start":             {},
+	"missing_success_criteria_count": {},
+	"missing_verification_count":     {},
+	"duplicate_prompt_count":         {},
+	"no_code_context_count":          {},
+	"runaway_tool_loop_count":        {},
+	"frustration_marker_count":       {},
+}
+
+func IsSupportedAnalyticsSignal(signal string) bool {
+	_, ok := supportedAnalyticsSignals[signal]
+	return ok
+}
 
 // inPlaceholders returns a "(?,?,...)" string and []any args for
 // a slice of string IDs.
@@ -2522,6 +2552,9 @@ func (db *DB) GetAnalyticsSignalSessions(
 	signal string,
 	limit int,
 ) (SignalSessionsResponse, error) {
+	if !IsSupportedAnalyticsSignal(signal) {
+		return SignalSessionsResponse{}, ErrUnsupportedAnalyticsSignal
+	}
 	if limit <= 0 || limit > 20 {
 		limit = 10
 	}
@@ -3513,9 +3546,6 @@ func buildSignalCalibrations(
 	rows []SignalRow,
 ) map[string]SignalCalibration {
 	signals := []string{
-		"outcome_errored",
-		"outcome_abandoned",
-		"outcome_completed",
 		"tool_failure_signals",
 		"tool_retries",
 		"edit_churn",

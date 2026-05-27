@@ -66,7 +66,11 @@ func TestUpdateSessionSignals(t *testing.T) {
 		{"EndedWithRole", got.EndedWithRole, "assistant"},
 		{"FinalFailureStreak", got.FinalFailureStreak, 0},
 		{"CompactionCount", got.CompactionCount, 2},
-		{"QualitySignalVersion", got.QualitySignalVersion, 1},
+		{
+			"QualitySignalVersion",
+			got.QualitySignalVersion,
+			CurrentQualitySignalVersion,
+		},
 		{"ShortPromptCount", got.ShortPromptCount, 2},
 		{"UnstructuredStart", got.UnstructuredStart, true},
 		{
@@ -275,14 +279,22 @@ func TestBackfillSignalsMarkerOnlyOnSuccess(t *testing.T) {
 	insertSession(t, d, "fail-1", "p")
 
 	// One session fails -- marker must NOT be set.
+	failOnce := true
+	compute := func(_ context.Context, id string) error {
+		if id == "fail-1" && failOnce {
+			failOnce = false
+			return fmt.Errorf("simulated failure")
+		}
+		return d.UpdateSessionSignals(id, SessionSignalUpdate{
+			QualitySignals: QualitySignals{
+				Version: CurrentQualitySignalVersion,
+			},
+		})
+	}
+
 	err := d.BackfillSignals(
 		ctx,
-		func(_ context.Context, id string) error {
-			if id == "fail-1" {
-				return fmt.Errorf("simulated failure")
-			}
-			return nil
-		},
+		compute,
 	)
 	if err == nil {
 		t.Fatal("expected error from partial backfill, got nil")
@@ -293,9 +305,9 @@ func TestBackfillSignalsMarkerOnlyOnSuccess(t *testing.T) {
 	calls := 0
 	err = d.BackfillSignals(
 		ctx,
-		func(_ context.Context, _ string) error {
+		func(ctx context.Context, id string) error {
 			calls++
-			return nil
+			return compute(ctx, id)
 		},
 	)
 	if err != nil {
@@ -327,5 +339,48 @@ func TestBackfillSignalsMarkerOnlyOnSuccess(t *testing.T) {
 				"(marker should be set after clean run)",
 			calls,
 		)
+	}
+}
+
+func TestBackfillSignalsRecomputesStaleQualityVersions(t *testing.T) {
+	d := testDB(t)
+	ctx := context.Background()
+
+	insertSession(t, d, "stale", "p")
+	insertSession(t, d, "current", "p")
+	insertSession(t, d, "empty", "p", func(s *Session) {
+		s.MessageCount = 0
+	})
+
+	if err := d.UpdateSessionSignals("stale", SessionSignalUpdate{
+		QualitySignals: QualitySignals{
+			Version: CurrentQualitySignalVersion - 1,
+		},
+	}); err != nil {
+		t.Fatalf("UpdateSessionSignals stale: %v", err)
+	}
+	if err := d.UpdateSessionSignals("current", SessionSignalUpdate{
+		QualitySignals: QualitySignals{
+			Version: CurrentQualitySignalVersion,
+		},
+	}); err != nil {
+		t.Fatalf("UpdateSessionSignals current: %v", err)
+	}
+	if err := d.MarkSignalsBackfillDone(); err != nil {
+		t.Fatalf("MarkSignalsBackfillDone: %v", err)
+	}
+
+	var calls []string
+	if err := d.BackfillSignals(
+		ctx,
+		func(_ context.Context, id string) error {
+			calls = append(calls, id)
+			return nil
+		},
+	); err != nil {
+		t.Fatalf("BackfillSignals: %v", err)
+	}
+	if len(calls) != 1 || calls[0] != "stale" {
+		t.Fatalf("calls = %v, want [stale]", calls)
 	}
 }

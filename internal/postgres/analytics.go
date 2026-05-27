@@ -2253,6 +2253,10 @@ func (s *Store) GetAnalyticsSignalSessions(
 	signal string,
 	limit int,
 ) (db.SignalSessionsResponse, error) {
+	if !db.IsSupportedAnalyticsSignal(signal) {
+		return db.SignalSessionsResponse{},
+			db.ErrUnsupportedAnalyticsSignal
+	}
 	if limit <= 0 || limit > 20 {
 		limit = 10
 	}
@@ -2383,7 +2387,8 @@ func (s *Store) signalMessages(
 			placeholders = append(placeholders, pb.add(id))
 		}
 		q := `SELECT session_id, ordinal, role, content,
-					COALESCE(timestamp::text, ''),
+					COALESCE(to_char(timestamp AT TIME ZONE 'UTC',
+						'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'), ''),
 					is_system, has_tool_use
 				FROM messages
 				WHERE session_id IN (` + strings.Join(placeholders, ",") + `)

@@ -63,7 +63,7 @@ func TestWriteSessionBatchCommitsGoodRowsAndSkipsBadRows(t *testing.T) {
 				Project:          "proj",
 				Machine:          defaultMachine,
 				Agent:            defaultAgent,
-				FirstMessage:     Ptr("hello"),
+				FirstMessage:     new(string("hello")),
 				MessageCount:     2,
 				UserMessageCount: 1,
 			},

@@ -1,5 +1,7 @@
 package parser
 
+import "slices"
+
 // TerminationStatus describes how a parsed session appears to have
 // ended. The empty string means "unknown" — caller should leave the
 // stored column NULL.
@@ -89,8 +91,8 @@ func isAwaitingUserStopReason(stopReason string) bool {
 // mark the final unresolved call as resolved.
 func hasOrphanedToolCall(messages []ParsedMessage) bool {
 	lastAssistantIdx := -1
-	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == RoleAssistant {
+	for i, v := range slices.Backward(messages) {
+		if v.Role == RoleAssistant {
 			lastAssistantIdx = i
 			break
 		}

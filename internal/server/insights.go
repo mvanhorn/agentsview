@@ -700,6 +700,9 @@ func markInsightCacheHit(s *db.Insight) {
 	if err := json.Unmarshal([]byte(s.ProvenanceJSON), &prov); err != nil {
 		return
 	}
+	if prov == nil {
+		return
+	}
 	prov["cache_status"] = "hit"
 	data, err := json.Marshal(prov)
 	if err != nil {

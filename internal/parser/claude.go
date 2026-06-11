@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -313,9 +314,9 @@ func ParseClaudeSession(
 // none. Used by Classify to decide between awaiting_user and
 // clean for sessions that ended without an orphan tool_use.
 func lastAssistantStopReason(messages []ParsedMessage) string {
-	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == RoleAssistant {
-			return messages[i].StopReason
+	for _, v := range slices.Backward(messages) {
+		if v.Role == RoleAssistant {
+			return v.StopReason
 		}
 	}
 	return ""

@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"slices"
 	"time"
 
 	"github.com/wesm/agentsview/internal/db"
@@ -253,9 +254,9 @@ func extractLastMessageRole(
 	if msgs == nil {
 		return "", ""
 	}
-	for i := len(msgs) - 1; i >= 0; i-- {
-		if !msgs[i].IsSystem {
-			return msgs[i].Role, msgs[i].Content
+	for _, v := range slices.Backward(msgs) {
+		if !v.IsSystem {
+			return v.Role, v.Content
 		}
 	}
 	return "", ""

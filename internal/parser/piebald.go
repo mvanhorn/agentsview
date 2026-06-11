@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -459,8 +460,8 @@ func splitPiebaldBranches(rows []piebaldMessageRow) []piebaldBranch {
 			}
 
 			mainIdx := len(kids) - 1
-			for i := len(kids) - 1; i >= 0; i-- {
-				if kids[i].enabled() {
+			for i, v := range slices.Backward(kids) {
+				if v.enabled() {
 					mainIdx = i
 					break
 				}

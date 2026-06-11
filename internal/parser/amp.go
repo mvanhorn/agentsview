@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -62,8 +63,8 @@ func ParseAmpSession(
 	traces := root.Get("meta.traces")
 	if traces.IsArray() {
 		traceList := traces.Array()
-		for i := len(traceList) - 1; i >= 0; i-- {
-			t := parseTimestamp(traceList[i].Get("endTime").Str)
+		for _, v := range slices.Backward(traceList) {
+			t := parseTimestamp(v.Get("endTime").Str)
 			if !t.IsZero() {
 				endTime = t
 				break

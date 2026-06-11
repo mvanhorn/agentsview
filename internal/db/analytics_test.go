@@ -1874,8 +1874,8 @@ func TestAnalyticsTerminationFilter(t *testing.T) {
 
 		insert := func(id string, term *string) {
 			insertSession(t, d, id, "p", func(s *Session) {
-				s.StartedAt = Ptr("2024-06-02T09:00:00Z")
-				s.EndedAt = Ptr("2024-06-02T10:00:00Z")
+				s.StartedAt = new(string("2024-06-02T09:00:00Z"))
+				s.EndedAt = new(string("2024-06-02T10:00:00Z"))
 				s.MessageCount = 5
 				s.UserMessageCount = 2
 				s.TerminationStatus = term

@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -60,8 +61,8 @@ func GetProjectName(dirName string) string {
 	}
 
 	// Strategy 2: use last non-system-directory component
-	for i := len(parts) - 1; i >= 0; i-- {
-		if p := parts[i]; p != "" && !ignoredSystemDirs[strings.ToLower(p)] {
+	for _, v := range slices.Backward(parts) {
+		if p := v; p != "" && !ignoredSystemDirs[strings.ToLower(p)] {
 			return NormalizeName(p)
 		}
 	}

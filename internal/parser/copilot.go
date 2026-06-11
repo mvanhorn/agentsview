@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -221,7 +222,7 @@ func (b *copilotSessionBuilder) handleToolComplete(
 func (b *copilotSessionBuilder) handleAssistantReasoning() {
 	// Mark the most recent assistant message as having
 	// thinking, if one exists.
-	for i := len(b.messages) - 1; i >= 0; i-- {
+	for i := range slices.Backward(b.messages) {
 		if b.messages[i].Role == RoleAssistant {
 			b.messages[i].HasThinking = true
 			return

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -203,7 +204,7 @@ func (b *codexSessionBuilder) handleTokenCountEvent(
 	// Find last assistant message without usage in the current
 	// turn. Stop at user message boundary so we don't cross
 	// turns.
-	for i := len(b.messages) - 1; i >= 0; i-- {
+	for i := range slices.Backward(b.messages) {
 		if b.messages[i].Role == RoleUser {
 			break
 		}

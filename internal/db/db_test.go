@@ -1014,9 +1014,9 @@ func TestCurrentDataVersionIncludesOpenCodeProjectMetadataChange(t *testing.T) {
 	t.Logf("CurrentDataVersion=%d", CurrentDataVersion())
 }
 
-func TestCurrentDataVersionGrokMessageTimestamps(t *testing.T) {
-	assert.Equal(t, 90, CurrentDataVersion(),
-		"Grok message timestamps require a sequential backfill")
+func TestCurrentDataVersionPositAssistantCacheWriteNormalization(t *testing.T) {
+	assert.Equal(t, 91, CurrentDataVersion(),
+		"Posit Assistant cache-write normalization requires a sequential backfill")
 }
 
 func TestInsertMessages_PreservesToolResultEvents(t *testing.T) {

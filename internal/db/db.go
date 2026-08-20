@@ -425,7 +425,11 @@ CREATE INDEX IF NOT EXISTS idx_provider_freshness_updated_at
 // (90: Grok message timestamp backfill. Grok chat-history rows do not carry
 // timestamps; re-parsing enriches them from the authoritative timestamped
 // updates stream so existing sessions participate in activity aggregation.)
-const dataVersion = 90
+// (91: Posit Assistant cache-write normalization. Non-Claude models backed by
+// inclusive usage APIs store their inferred uncached input remainder in the
+// exclusive cacheWriteTokens bucket. Re-parsing moves that remainder to fresh
+// input while preserving genuine Claude cache creation and total context.)
+const dataVersion = 91
 
 const tokenCoverageRepairStatsKey = "token_coverage_repair_v1"
 

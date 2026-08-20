@@ -968,7 +968,7 @@ func positAssistantFillAssistant(
 	msg.HasThinking = len(thinkingParts) > 0
 	msg.HasToolUse = len(msg.ToolCalls) > 0
 	msg.Model = positai.Get("modelId").Str
-	positAssistantFillTokenUsage(msg, positai.Get("usage"))
+	positAssistantFillTokenUsage(msg, msg.Model, positai.Get("usage"))
 }
 
 func positAssistantToolCall(part gjson.Result) (ParsedToolCall, bool) {
@@ -1012,11 +1012,16 @@ func positAssistantToolResults(content gjson.Result) []ParsedToolResult {
 }
 
 // positAssistantFillTokenUsage maps positai usage metadata onto the message.
-// ContextTokens counts the full billed context (fresh input plus cache reads
-// and writes), matching the Claude parser's attribution. TokenUsage is
-// re-emitted with Claude-style snake_case keys so downstream token-presence
-// and cost consumers read it uniformly.
-func positAssistantFillTokenUsage(msg *ParsedMessage, usage gjson.Result) {
+// Posit Assistant stores exclusive token buckets, but models backed by
+// inclusive usage APIs place their inferred uncached input remainder in
+// cacheWriteTokens. Only Claude-family models report genuine cache creation in
+// that bucket. ContextTokens always counts the normalized fresh input, cache
+// reads, and genuine cache creation. TokenUsage is re-emitted with Claude-style
+// snake_case keys so downstream token-presence and cost consumers read it
+// uniformly.
+func positAssistantFillTokenUsage(
+	msg *ParsedMessage, model string, usage gjson.Result,
+) {
 	if !usage.Exists() {
 		return
 	}
@@ -1041,7 +1046,13 @@ func positAssistantFillTokenUsage(msg *ParsedMessage, usage gjson.Result) {
 	cacheWriteField := usage.Get("cacheWriteTokens")
 	if cacheWriteField.Exists() {
 		cacheWrite = int(cacheWriteField.Int())
-		tokenUsage["cache_creation_input_tokens"] = cacheWrite
+		if positAssistantClaudeModel(model) {
+			tokenUsage["cache_creation_input_tokens"] = cacheWrite
+		} else {
+			input += cacheWrite
+			cacheWrite = 0
+			tokenUsage["input_tokens"] = input
+		}
 	}
 	if len(tokenUsage) == 0 {
 		return
@@ -1059,6 +1070,14 @@ func positAssistantFillTokenUsage(msg *ParsedMessage, usage gjson.Result) {
 	if err == nil {
 		msg.TokenUsage = tokenUsageJSON
 	}
+}
+
+func positAssistantClaudeModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	if slash := strings.LastIndexByte(model, '/'); slash >= 0 {
+		model = model[slash+1:]
+	}
+	return model == "claude" || strings.HasPrefix(model, "claude-")
 }
 
 func positAssistantTime(ms int64) time.Time {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 // Fixture directory names are short stand-ins for the UUIDs and workspace
@@ -499,6 +500,123 @@ func TestPositAssistantProviderParseSparseTokenUsage(t *testing.T) {
 		"usage objects without recognized token fields must not mark coverage")
 	assert.False(t, empty.HasOutputTokens)
 	assert.False(t, empty.HasContextTokens)
+}
+
+func TestPositAssistantProviderNormalizesTokenUsageByModelFamily(t *testing.T) {
+	tests := []struct {
+		name             string
+		message          string
+		wantContext      int
+		wantOutput       int
+		wantContextKnown bool
+		wantOutputKnown  bool
+		wantTokenUsage   string
+	}{
+		{
+			name: "GLM 5.2 inferred cache write becomes fresh input",
+			message: `{"role":"assistant","content":"done","providerOptions":{"providerMetadata":{"positai":{` +
+				`"modelId":"glm-5-2","usage":{"inputTokens":0,"outputTokens":42,"totalTokens":1242,` +
+				`"cacheReadTokens":200,"cacheWriteTokens":1000}}}}}`,
+			wantContext:      1200,
+			wantOutput:       42,
+			wantContextKnown: true,
+			wantOutputKnown:  true,
+			wantTokenUsage: `{"input_tokens":1000,"output_tokens":42,` +
+				`"cache_read_input_tokens":200}`,
+		},
+		{
+			name: "Gemma 4 inferred cache write becomes fresh input",
+			message: `{"role":"assistant","content":"done","providerOptions":{"providerMetadata":{"positai":{` +
+				`"modelId":"gemma-4","usage":{"inputTokens":0,"outputTokens":21,"totalTokens":821,` +
+				`"cacheReadTokens":100,"cacheWriteTokens":700}}}}}`,
+			wantContext:      800,
+			wantOutput:       21,
+			wantContextKnown: true,
+			wantOutputKnown:  true,
+			wantTokenUsage: `{"input_tokens":700,"output_tokens":21,` +
+				`"cache_read_input_tokens":100}`,
+		},
+		{
+			name: "Kimi K3 inferred cache write becomes fresh input",
+			message: `{"role":"assistant","content":"done","providerOptions":{"providerMetadata":{"positai":{` +
+				`"modelId":"kimi-k3","usage":{"inputTokens":0,"outputTokens":18,"totalTokens":618,` +
+				`"cacheReadTokens":0,"cacheWriteTokens":600}}}}}`,
+			wantContext:      600,
+			wantOutput:       18,
+			wantContextKnown: true,
+			wantOutputKnown:  true,
+			wantTokenUsage: `{"input_tokens":600,"output_tokens":18,` +
+				`"cache_read_input_tokens":0}`,
+		},
+		{
+			name: "non-Claude cached follow-up keeps fresh and cached input distinct",
+			message: `{"role":"assistant","content":"done","providerOptions":{"providerMetadata":{"positai":{` +
+				`"modelId":"glm-5-2","usage":{"inputTokens":25,"outputTokens":12,"totalTokens":1012,` +
+				`"cacheReadTokens":900,"cacheWriteTokens":75}}}}}`,
+			wantContext:      1000,
+			wantOutput:       12,
+			wantContextKnown: true,
+			wantOutputKnown:  true,
+			wantTokenUsage: `{"input_tokens":100,"output_tokens":12,` +
+				`"cache_read_input_tokens":900}`,
+		},
+		{
+			name: "Claude cache write remains cache creation",
+			message: `{"role":"assistant","content":"done","providerOptions":{"providerMetadata":{"positai":{` +
+				`"modelId":"claude-sonnet-4-6","usage":{"inputTokens":12,"outputTokens":34,"totalTokens":246,` +
+				`"cacheReadTokens":100,"cacheWriteTokens":100}}}}}`,
+			wantContext:      212,
+			wantOutput:       34,
+			wantContextKnown: true,
+			wantOutputKnown:  true,
+			wantTokenUsage: `{"input_tokens":12,"output_tokens":34,` +
+				`"cache_creation_input_tokens":100,"cache_read_input_tokens":100}`,
+		},
+		{
+			name: "non-Claude sparse output remains output-only",
+			message: `{"role":"assistant","content":"done","providerOptions":{"providerMetadata":{"positai":{` +
+				`"modelId":"glm-5-2","usage":{"outputTokens":17}}}}}`,
+			wantOutput:      17,
+			wantOutputKnown: true,
+			wantTokenUsage:  `{"output_tokens":17}`,
+		},
+		{
+			name: "Claude sparse output remains output-only",
+			message: `{"role":"assistant","content":"done","providerOptions":{"providerMetadata":{"positai":{` +
+				`"modelId":"claude-haiku-4-5","usage":{"outputTokens":19}}}}}`,
+			wantOutput:      19,
+			wantOutputKnown: true,
+			wantTokenUsage:  `{"output_tokens":19}`,
+		},
+		{
+			name: "non-Claude empty usage remains empty",
+			message: `{"role":"assistant","content":"done","providerOptions":{"providerMetadata":{"positai":{` +
+				`"modelId":"gemma-4","usage":{}}}}}`,
+		},
+		{
+			name: "Claude absent usage remains empty",
+			message: `{"role":"assistant","content":"done","providerOptions":{"providerMetadata":{"positai":{` +
+				`"modelId":"claude-sonnet-4-6"}}}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, ok := positAssistantMessageFromLM(
+				gjson.Parse(tt.message), time.Time{}, 0,
+			)
+			require.True(t, ok)
+			assert.Equal(t, tt.wantContext, msg.ContextTokens)
+			assert.Equal(t, tt.wantOutput, msg.OutputTokens)
+			assert.Equal(t, tt.wantContextKnown, msg.HasContextTokens)
+			assert.Equal(t, tt.wantOutputKnown, msg.HasOutputTokens)
+			if tt.wantTokenUsage == "" {
+				assert.Empty(t, msg.TokenUsage)
+				return
+			}
+			assert.JSONEq(t, tt.wantTokenUsage, string(msg.TokenUsage))
+		})
+	}
 }
 
 func TestPositAssistantProviderClassifiesDeletedPaths(t *testing.T) {

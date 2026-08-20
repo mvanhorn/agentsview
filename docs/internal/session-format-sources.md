@@ -1416,11 +1416,17 @@ add an archived or maintained mirror without replacing the original identity.
   `conversation.json`, or `lm-messages.jsonl`. Demo and feedback repositories
   were also public, but no matching producer or authoritative
   persisted-session schema was found.
-- **Usage and cost:** Language-model messages can persist input, output,
-  cache-read, and cache-write tokens with model identity. Agentsview
-  catalog-prices these values; no provider-reported USD total is consumed.
+- **Usage and cost:** Language-model messages persist an exclusive-token object
+  with input, output, cache-read, cache-write, and total counts plus model
+  identity. Observed non-Claude records backed by inclusive usage APIs place
+  the inferred uncached-input remainder in `cacheWriteTokens`; Agentsview folds
+  that remainder into fresh input for catalog pricing. Claude-family records
+  retain `cacheWriteTokens` as genuine cache creation. In both cases the full
+  input context is fresh input plus cache reads plus genuine cache creation. No
+  provider-reported USD total is consumed.
 - **Agentsview:** `internal/parser/posit_assistant_provider.go`; current schema
-  details are based on observed files and fixtures.
+  details are based on observed files and fixtures, reverified 2026-08-20
+  against non-Claude inclusive-usage records and a Claude-family control.
 
 ## Z Code (`zcode`)
 
